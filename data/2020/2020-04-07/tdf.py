@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-DATA_DIR = "data/2020-04-07"
+DATA_DIR = "."
 stage_data = pd.read_csv(f"{DATA_DIR}/stage_data.csv")
 tdf_stages = pd.read_csv(f"{DATA_DIR}/tdf_stages.csv")
 tdf_winners = pd.read_csv(f"{DATA_DIR}/tdf_winners.csv")
