@@ -1,0 +1,286 @@
+---
+title: "Tour de France"
+author: "John Lam"
+date: "6/2/2020"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Analyzing Tour de France videos
+
+David Robinson [Tidy Tuesday](https://www.youtube.com/watch?v=vT-DElIaKtE) video
+
+Tour de France [dataset](https://github.com/rfordatascience/tidytuesday/blob/master/data/2020/2020-04-07/readme.md)
+
+Interesting that he doesn't write it.
+
+```{r}
+library(tidytuesdayR)
+library(tidyverse)
+library(lubridate)
+library(janitor)
+
+theme_set(theme_light())
+```
+
+Download the data using the tidytuesdayR library.
+
+```{r}
+tuesdata <- tidytuesdayR::tt_load('2020-04-07')
+tuesdata <- tidytuesdayR::tt_load(2020, week = 15)
+```
+
+The first thing he does is scroll through some of the data and ask some questions. Let's pop the data
+into a viewer to examine the data. 
+
+FEATURE IDEA: View goes into a window that can be popped out so that you can look at the data. It would
+be in some cases helpful to always have that window pinned to the side (or on another monitor even) so
+that the user can refer back to it quickly.
+
+```{r}
+View(tuesdata$tdf_winners)
+```
+
+Next, let's look at the data. For convenience assign to local vars
+
+He later comes back to this cell to add some additional data cleaning steps. In this case there's a package called janitor, and the `clean_names` function will fix up messy names (he prefers underscore_case vs. PascalCase)
+
+FEATURE IDEA: Keyboard shortcuts to quickly focus between different windows. In RStudio case, you can
+focus onto console using CTRL+1, and then use CTRL+2 to send focus back to the editor.
+
+To see all keyboard shortcuts in RStudio, hit SHIFT+ALT+K
+
+```{r}
+tdf_winners <- tuesdata$tdf_winners %>% 
+  mutate(year = year(start_date),
+         speed = distance/time_overall)
+tdf_stages <- tuesdata$tdf_stages %>% 
+  janitor::clean_names() %>% 
+  mutate(year = year(date))
+stage_data <- tuesdata$stage_data
+```
+
+Look at the winner's birth country and count them
+
+```{r}
+tdf_winners %>% 
+  count(birth_country, sort = TRUE)
+```
+
+Now generate a bar plot from the above. When I hit CTRL+SHIFT+ENTER to run the chunk, it puts all of 
+its output into the Plots window. Now what I would like to do is either:
+
+FEATURE IDEA: Having things output to the Plots window so that each successive rendered plot 
+is added to the plot _history_. This is helpful since I can scroll backwards. Note that RStudio
+doesn't really do this today; but they do output the plot commands to the console window so you
+could manually stitch things back together. This is an area where VS Code Interactive mode works
+really nicely as we preserve the code.
+
+FEATURE IDEA: Gather plot. So given a history of plots, generate a new notebook that will reproducibly
+generate **just that plot**. This could be really cool.
+
+FEATURE IDEA: When running a plot, have an option to direct output to the plot window or to Jupyter
+
+```{r}
+tdf_winners %>% 
+  count(birth_country, sort = TRUE) %>% 
+  mutate(birth_country = fct_reorder(birth_country, n)) %>% 
+  ggplot(aes(n, birth_country)) + 
+  geom_col() + 
+  labs(y = "",
+       title = "What countries were the most Tour de France winners born in?")
+
+```
+
+Who are the winners?
+
+```{r}
+tdf_winners %>% 
+  count(winner_name, birth_country, sort = TRUE)
+```
+
+How does age distribution change over time?
+Note the crazy "truncated division mod 10" operator %/%
+
+NOTE: at this point, he loads dplyr which requires restarting the R session - this is a great
+example of why running from the start is important: reloading a library
+
+NOTE: RStudio uses keystroke CTRL+ALT+P to run all chunks from the top
+
+```{r}
+tdf_winners %>% 
+    group_by(decade = 10 * (year %/% 10)) %>% 
+    summarize(winner_age = mean(age),
+              winner_height = mean(height, na.rm = TRUE))
+```
+
+Now he wants to show something else, but he winds up overwriting in previous chunk
+I'm preserving it here for interest.
+
+FEATURE IDEA: dupe current cell feature. All it does is dupe the current cell so that it saves you some
+keystrokes before you wind up needing to do it in the next cell
+
+In this section he plots against age, height and weight over time to generate a series of 3 plots. He 
+does so by manually changing aes(decade, <param>) for each plot
+
+None of these look particularly interesting because he doesn't see any time-based trends to dig deeper 
+into for each of these variables.
+
+FEATURE IDEA: how do you quickly generate plots over a set of variables?
+
+```{r}
+by_decade <- tdf_winners %>% 
+    group_by(decade = 10 * (year %/% 10)) %>% 
+    summarize(winner_age = mean(age),
+              winner_height = mean(height, na.rm = TRUE),
+              winner_weight = mean(weight, na.rm = TRUE),
+              winner_margin = mean(time_margin, na.rm = TRUE),
+              winner_speed = mean(speed, na.rm = TRUE))
+```
+
+He realizes that there's something interesting in the `by_decade` data so he pulls it into its own 
+top-level variable
+
+```{r}
+by_decade %>% 
+    ggplot(aes(decade, winner_height)) +
+    geom_line() +
+    expand_limits(y = 0)
+```
+
+Manually looking over the data, he sees that we can look at time_margin as a parameter
+so he winds up adding / mutating the existing chunk. Again, I added it below here.
+
+```{r}
+by_decade %>% 
+    filter(decade >= 1910) %>% 
+    ggplot(aes(decade, winner_margin * 60)) +
+    geom_line() +
+    expand_limits(y = 0) +
+  labs(x = "Decade",
+       y = "Average victory margin (minutes)",
+       title = "Tour de France margin of victory has been getting smaller")
+```
+
+Note that the Zoom button (borrowed from RTVS :)) pops out the window. We did this to enable multi-mon
+support more easily using VS which did have facility for multiple monitors and docking.
+
+```{r}
+by_decade %>% 
+    filter(decade >= 1910) %>% 
+    ggplot(aes(decade, winner_margin * 60)) +
+    geom_line() +
+    expand_limits(y = 0) +
+  labs(x = "Decade",
+       y = "Average victory margin (minutes)",
+       title = "Tour de France margin of victory has been getting smaller")
+```
+
+Next he looks at average speed of winners. This is an interesting # that reflects technological and 
+training changes over time.
+
+He starts by looking at winner_time which won't correlate because races are different distances.
+He likes to do data cleaning in a specific chunk in the rmd. So he moves backwards to an earlier
+chunk and mutates that chunk to add a new column for speed
+
+Note that he also just views it by typing View(by_decade) into the console window. So this is another
+example of a "quick lookup" step in the tooling.
+
+```{r}
+by_decade %>% 
+    filter(decade >= 1910) %>% 
+    ggplot(aes(decade, winner_speed)) +
+    geom_line() +
+    expand_limits(y = 0) +
+  labs(x = "Decade",
+       y = "Average speed (km/h)",
+       title = "Tour de France winners have been getting faster")
+```
+
+Now he's interested in seeing if he can determine if the race has been getting "easier". Of course 
+elevation plays into this.
+
+Looking at the data can you cluster riders into those racing for stage wins vs. GC candidates? I 
+wonder if he does this. If not, I can do the same thing - we have weight and height which would 
+be a nice thing to cluster stage win hunters vs. GC candidates.
+
+
+So now he's interested in a specific question: what is the life expectancy of a TdF winner? It's a 
+bizarre question for cycling, but it is interesting from the perspective of understanding survival
+analysis. This is an interesting problem because most of the winners are still alive AND those who
+have died would have been biased towards dying earlier for whatever reason.
+
+There is a library called survival which is used for this. Let's see how.
+
+We will compute a column called dead which is set to 1 for all who have a death_year column.
+In survivorship, we can overload the death_year column with the current column for all those 
+who haven't died yet. We do this by mutating the death_year column via another mutate operation
+using the coalesce function which will, for the cases where death_year
+doesn't have a value (NA), it will replace NA with 2020, which is the latest year for
+which we have data about whether they are alive or dead.
+
+NOTENOTE: this may not be an especially interesting thing to port to Python if survival is not
+something that there is an equivalent library for.
+
+The broom library makes it easy to convert data analysis objects, e.g., those that come out of survival
+into a tibble that is easier to read (see the output below)
+
+CONCLUSION: median life expectancy for a TdF winner is 77. 
+
+ASIDE - would be interesting to invoke survival analysis against COVID-19 datasets
+
+```{r}
+library(survival)
+library(broom)
+
+surv_model <- tdf_winners %>% 
+  distinct(winner_name, .keep_all = TRUE) %>% 
+  transmute(winner_name,
+            birth_year = year(born),
+            death_year = year(died),
+            dead = as.integer(!is.na(death_year))) %>%  
+  mutate(age_at_death = coalesce(death_year, 2020) - birth_year) %>% 
+  survfit(Surv(age_at_death, dead) ~ 1, data = .)
+glance(surv_model)
+```
+
+Now let's create a plot of this so that we can see what the output looks like:
+
+```{r}
+surv_model %>% 
+  plot()
+```
+
+## Visualization of progression of points winners in the TdF
+
+This is largely a useless (though interesting) visualization as it says virtually nothing interesting
+or insightful about cycling. All this shows are the top N points riders and the progression of their
+point totals throughout the stages.
+
+What is interesting about it, however, is that it shows the visualization of the progression of a 
+computation (which eventually gets turned into an animation). It lets you spot the Marcel Kittel 
+anomaly in the data (he dropped out after a crash on Stage 17 that year). 
+
+OBSERVATION: there is something he does quite a bit when trying to see what the range of values are
+in a column. He uses a count expression:
+
+`stages_joined %>% count(rank, sort=TRUE)`
+
+He did this to examine the data 
+
+```{r}
+stages_joined <- stage_data %>% 
+  extract(stage_results_id, "stage", "stage-(.*)") %>% 
+  inner_join(tdf_stages, by = c("year", "stage"))
+
+stages_joined %>% 
+  group_by(winner_country) %>% 
+  summarize(stages = n())
+
+```
+
