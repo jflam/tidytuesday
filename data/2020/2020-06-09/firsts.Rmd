@@ -1,0 +1,49 @@
+---
+title: "Firsts"
+author: "John Lam"
+date: "6/12/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+  
+```{r}
+# African american achievements 
+# EM Sogin 
+
+# load packages
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(tidytext)
+library(wordcloud2)
+library(htmlwidgets)
+library(webshot)
+
+webshot::install_phantomjs()
+```
+
+```{r}
+# load data
+firsts <- readr::read_csv('./firsts.csv')
+head(firsts)
+```
+
+```{r}
+# convert accomplishment to text
+acc<-firsts %>% 
+  select(accomplishment) %>% unnest_tokens(word,accomplishment) %>% 
+  anti_join(stop_words) %>% 
+  count(word,sort=T) %>% filter(n<400) 
+head(acc)
+```
+
+```{r}
+my_graph<-wordcloud2(acc, figPath = "./blm.jpg",size = 1.0, color = "#ffe0e0", backgroundColor="#808080")
+my_graph
+saveWidget(my_graph,"tmp.html",selfcontained = F)
+webshot("tmp.html","blm_words.png", delay =5, vwidth = 480, vheight=480) # changed to png. 
+```
+
